@@ -57,16 +57,29 @@ class MainActivity : Activity() {
                 visibility = if (d.mac.startsWith("(")) View.GONE else View.VISIBLE
                 setOnClickListener { copyText("MAC", d.mac, "Copied ${d.mac}") }
             }
-            view.findViewById<TextView>(R.id.frames).apply {
-                if (d.sent == 0) visibility = View.GONE
-                else {
-                    visibility = View.VISIBLE
-                    val pct = d.lost * 100 / d.sent
-                    val ms = d.avgMs?.let { "  •  Ping ${"%.0f".format(it)} ms" } ?: ""
-                    val noReply = d.lost >= d.sent
-                    text = (if (noReply) "● NO REPLY (connected, not responding)\n" else "● ONLINE\n") +
-                        "Frames lost: ${d.lost}/${d.sent} ($pct%)$ms"
-                    setTextColor(when { pct == 0 -> 0xFF34D399.toInt(); pct <= 10 -> 0xFFFBBF24.toInt(); else -> 0xFFF87171.toInt() })
+            val box = view.findViewById<View>(R.id.statusBox)
+            if (d.sent == 0) box.visibility = View.GONE
+            else {
+                box.visibility = View.VISIBLE
+                val pct = d.lost * 100 / d.sent
+                val noReply = d.lost >= d.sent
+                val col = when { pct == 0 -> 0xFF34D399.toInt(); pct <= 10 -> 0xFFFBBF24.toInt(); else -> 0xFFF87171.toInt() }
+                view.findViewById<TextView>(R.id.status).apply {
+                    text = if (noReply) "\u25CF NO REPLY" else "\u25CF ONLINE"
+                    setTextColor(col)
+                    (background.mutate() as GradientDrawable).setColor((col and 0x00FFFFFF) or 0x26000000)
+                }
+                view.findViewById<TextView>(R.id.pingText).apply {
+                    text = d.avgMs?.let { "Ping ${"%.0f".format(it)} ms" } ?: if (noReply) "connected, not responding" else ""
+                    setTextColor(if (d.avgMs == null) 0xFF94A3B8.toInt() else 0xFFF1F5F9.toInt())
+                }
+                view.findViewById<TextView>(R.id.lostText).apply {
+                    text = "${d.lost}/${d.sent}  ($pct%)"
+                    setTextColor(col)
+                }
+                view.findViewById<View>(R.id.barFill).apply {
+                    (background.mutate() as GradientDrawable).setColor(col)
+                    layoutParams = (layoutParams as LinearLayout.LayoutParams).also { it.weight = (100 - pct).toFloat() }
                 }
             }
             view.findViewById<TextView>(R.id.tags).apply {
