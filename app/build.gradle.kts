@@ -3,11 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace = "com.example.wifiscan"
+    namespace = "com.wifiradar.app"
     compileSdk = 34
     defaultConfig {
-        applicationId = "com.example.wifiscan"
-        minSdk = 24
+        applicationId = "com.wifiradar.app"
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"

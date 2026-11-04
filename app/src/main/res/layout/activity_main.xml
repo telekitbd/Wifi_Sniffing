@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center_vertical" android:orientation="horizontal">
+        <LinearLayout
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="WiFi Radar" android:textColor="@color/text"
+                android:textSize="26sp" android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="See who is on your network" android:textColor="@color/muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+        <TextView
+            android:id="@+id/copyAllBtn"
+            android:layout_width="wrap_content" android:layout_height="40dp"
+            android:layout_marginEnd="8dp" android:background="@drawable/bg_card"
+            android:gravity="center" android:paddingStart="14dp" android:paddingEnd="14dp"
+            android:text="Copy all" android:textColor="@color/accent"
+            android:textSize="13sp" android:textStyle="bold" />
+        <TextView
+            android:id="@+id/helpBtn"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:background="@drawable/bg_card" android:gravity="center"
+            android:text="?" android:textColor="@color/accent"
+            android:textSize="18sp" android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:background="@drawable/bg_card"
+        android:gravity="center_vertical" android:orientation="horizontal"
+        android:padding="16dp">
+        <LinearLayout
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <LinearLayout
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:gravity="center_vertical" android:orientation="horizontal">
+                <View
+                    android:id="@+id/rootDot"
+                    android:layout_width="10dp" android:layout_height="10dp" />
+                <TextView
+                    android:id="@+id/rootText"
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp" android:text="Checking root..."
+                    android:textColor="@color/text" android:textSize="14sp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/netText"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="Network: -"
+                android:textColor="@color/muted" android:textSize="13sp" />
+        </LinearLayout>
+        <LinearLayout
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:gravity="center_horizontal" android:orientation="vertical">
+            <TextView
+                android:id="@+id/countText"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="0" android:textColor="@color/accent"
+                android:textSize="34sp" android:textStyle="bold" />
+            <TextView
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="devices" android:textColor="@color/muted" android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:indeterminate="true"
+        android:indeterminateTint="@color/accent" android:visibility="invisible" />
+
+    <FrameLayout
+        android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1">
+        <ListView
+            android:id="@+id/list"
+            android:layout_width="match_parent" android:layout_height="match_parent"
+            android:divider="@android:color/transparent" android:dividerHeight="10dp"
+            android:clipToPadding="false" android:scrollbars="none" />
+        <TextView
+            android:id="@+id/empty"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_gravity="center" android:gravity="center"
+            android:text="Tap Scan to find devices\non your WiFi"
+            android:textColor="@color/muted" android:textSize="15sp" />
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:paddingBottom="8dp"
+        android:text="Tap Copy MAC  •  Long-press a card to copy all details"
+        android:textColor="@color/muted" android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/scanBtn"
+        android:layout_width="match_parent" android:layout_height="56dp"
+        android:background="@drawable/bg_button" android:stateListAnimator="@null"
+        android:text="Scan network" android:textAllCaps="false"
+        android:textColor="@color/bg" android:textSize="16sp" android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/creditsBtn"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:paddingTop="12dp" android:paddingBottom="4dp"
+        android:text="Credits &amp; Community" android:textColor="@color/muted"
+        android:textSize="13sp" />
+</LinearLayout>
