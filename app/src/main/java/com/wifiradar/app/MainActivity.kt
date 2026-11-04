@@ -57,6 +57,18 @@ class MainActivity : Activity() {
                 visibility = if (d.mac.startsWith("(")) View.GONE else View.VISIBLE
                 setOnClickListener { copyText("MAC", d.mac, "Copied ${d.mac}") }
             }
+            view.findViewById<TextView>(R.id.frames).apply {
+                if (d.sent == 0) visibility = View.GONE
+                else {
+                    visibility = View.VISIBLE
+                    val pct = d.lost * 100 / d.sent
+                    val ms = d.avgMs?.let { "  •  Ping ${"%.0f".format(it)} ms" } ?: ""
+                    val noReply = d.lost >= d.sent
+                    text = (if (noReply) "● NO REPLY (connected, not responding)\n" else "● ONLINE\n") +
+                        "Frames lost: ${d.lost}/${d.sent} ($pct%)$ms"
+                    setTextColor(when { pct == 0 -> 0xFF34D399.toInt(); pct <= 10 -> 0xFFFBBF24.toInt(); else -> 0xFFF87171.toInt() })
+                }
+            }
             view.findViewById<TextView>(R.id.tags).apply {
                 text = d.tags.joinToString("  •  ")
                 visibility = if (d.tags.isEmpty()) View.GONE else View.VISIBLE
@@ -78,10 +90,6 @@ class MainActivity : Activity() {
         empty = findViewById(R.id.empty)
 
         list.adapter = adapter
-        list.setOnItemClickListener { _, _, pos, _ ->
-            val mac = devices[pos].mac
-            if (!mac.startsWith("(")) copyText("MAC", mac, "Copied $mac")
-        }
         list.setOnItemLongClickListener { _, _, pos, _ ->
             val d = devices[pos]
             copyText("Device", "${d.name}\n${d.type}\n${d.ip}\n${d.mac}", "Copied name, type, IP and MAC")
@@ -166,11 +174,15 @@ class MainActivity : Activity() {
         rootDot.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color) }
     }
 
-    private fun showStatus(root: Boolean, wifi: Pair<String, String>?) {
+    private fun showStatus(root: Boolean, wifi: Pair<String, String>?, internet: Boolean? = null) {
         dot(if (root) 0xFF34D399.toInt() else 0xFFF87171.toInt())
         rootText.text = if (root) "Root granted" else "No root access"
         netText.text = if (wifi != null) "Network: ${wifi.second.substringBeforeLast(".")}.0/24"
         else "Not connected to WiFi"
+        if (wifi != null && internet != null) {
+            netText.text = netText.text.toString() + "\nInternet: " + if (internet) "WORKING" else "NO INTERNET"
+            netText.setTextColor(if (internet) 0xFF34D399.toInt() else 0xFFF87171.toInt())
+        } else netText.setTextColor(0xFF94A3B8.toInt())
     }
 
     private fun refreshStatus() {
@@ -192,6 +204,7 @@ class MainActivity : Activity() {
             val root = Scanner.hasRoot()
             val wifi = Scanner.localWifi()
             val found = if (root && wifi != null) Scanner.scan(applicationContext) else emptyList()
+            val net = if (root && wifi != null) Scanner.hasInternet(wifi.first) else null
             runOnUiThread {
                 scanBtn.isEnabled = true
                 scanBtn.alpha = 1f
@@ -200,7 +213,7 @@ class MainActivity : Activity() {
                 devices.clear(); devices.addAll(found)
                 adapter.notifyDataSetChanged()
                 countText.text = found.size.toString()
-                showStatus(root, wifi)
+                showStatus(root, wifi, net)
                 if (found.isEmpty()) {
                     empty.visibility = View.VISIBLE
                     empty.text = when {
@@ -229,6 +242,8 @@ class MainActivity : Activity() {
                 "6. \"Copy all\" copies the whole list\n\n" +
                 "GOOD TO KNOW\n" +
                 "• Type (Phone / Computer / Router...) is detected from name, open ports and MAC vendor. A \"?\" means it is a best guess\n" +
+                "• Top card: \"Internet: WORKING / NO INTERNET\" tells if this whole WiFi has internet. Each device shows ONLINE (green) or NO REPLY (red). Android cannot see whether one single device has internet\n" +
+                "• \"Frames lost\" = how many of 10 test pings got no reply. More lost frames and higher ping usually means that device (or the WiFi) is busy\n" +
                 "• \"Unknown\" = device does not share its name\n" +
                 "• \"Private MAC\" = phone uses a random MAC for this WiFi\n" +
                 "• Your own MAC is hidden by Android\n" +

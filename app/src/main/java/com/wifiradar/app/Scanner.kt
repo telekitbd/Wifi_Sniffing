@@ -13,7 +13,8 @@ import java.util.concurrent.Executors
 
 data class Device(
     val ip: String, val mac: String, val name: String, val tags: List<String>,
-    val type: String = "Unknown", val vendor: String? = null
+    val type: String = "Unknown", val vendor: String? = null,
+    val sent: Int = 0, val lost: Int = 0, val avgMs: Double? = null
 )
 
 object Scanner {
@@ -105,6 +106,20 @@ object Scanner {
         return "Unknown" to false
     }
 
+    /** Does this WiFi network really reach the internet? (pings public servers through the wlan interface) */
+    fun hasInternet(iface: String): Boolean =
+        listOf("8.8.8.8", "1.1.1.1").any { su("ping -c 2 -W 2 -I $iface $it 2>&1").contains(Regex("[1-9]\\d* (packets )?received")) }
+
+    /** Sends 10 pings and counts lost frames: (sent, lost, avg latency ms) */
+    private fun pingStats(ip: String): Triple<Int, Int, Double?> {
+        val out = su("ping -c 10 -i 0.2 -W 1 $ip 2>&1")
+        val m = Regex("(\\d+) packets transmitted, (\\d+) (?:packets )?received").find(out)
+        val sent = m?.groupValues?.get(1)?.toIntOrNull() ?: 10
+        val recv = m?.groupValues?.get(2)?.toIntOrNull() ?: 0
+        val avg = Regex("= [\\d.]+/([\\d.]+)/").find(out)?.groupValues?.get(1)?.toDoubleOrNull()
+        return Triple(sent, sent - recv, avg)
+    }
+
     fun scan(ctx: Context): List<Device> {
         val (iface, myIp) = localWifi() ?: return emptyList()
         val base = myIp.substringBeforeLast(".")
@@ -138,7 +153,8 @@ object Scanner {
                 tags += if (guess) "$type?" else type
                 if (vendor != null) tags += vendor
                 if (random) tags += "Private MAC"
-                Device(ip, mac, name, tags, type, vendor)
+                val (sent, lost, avg) = pingStats(ip)
+                Device(ip, mac, name, tags, type, vendor, sent, lost, avg)
             })
         }
         val result = futures.map { it.get() }.toMutableList()
