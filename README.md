@@ -18,6 +18,9 @@ Rooted Android app that lists every device on the WiFi you are connected to, wit
 4. Long-press a card to copy name + IP + MAC
 5. **Copy all** (top) copies the whole device list
 
+## Device type detection
+Each device is labelled Phone / Computer / Router / Printer / TV. Detection uses the device name, open ports, ping TTL and the MAC vendor (offline list in `res/raw/oui.txt`). A trailing `?` (e.g. `Phone?`) means a best guess. Devices with a Private MAC have no usable vendor, so they rely on name/ports.
+
 ## Notes
 - "Unknown" name: the device does not share its name on the network
 - "Private MAC": the phone uses a random MAC for this WiFi

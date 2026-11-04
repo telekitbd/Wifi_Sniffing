@@ -1,14 +1,20 @@
 package com.wifiradar.app
 
+import android.content.Context
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Socket
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 
-data class Device(val ip: String, val mac: String, val name: String, val tags: List<String>)
+data class Device(
+    val ip: String, val mac: String, val name: String, val tags: List<String>,
+    val type: String = "Unknown", val vendor: String? = null
+)
 
 object Scanner {
 
@@ -31,12 +37,84 @@ object Scanner {
         return null
     }
 
-    fun scan(): List<Device> {
+    // ---- vendor (OUI) database, loaded once from res/raw/oui.txt ----
+    private var oui: HashMap<String, String>? = null
+    private fun vendorOf(ctx: Context, mac: String): String? {
+        val db = oui ?: HashMap<String, String>(40000).also { m ->
+            ctx.resources.openRawResource(R.raw.oui).bufferedReader().forEachLine { l ->
+                if (l.length > 7) m[l.substring(0, 6)] = l.substring(7)
+            }
+            oui = m
+        }
+        return db[mac.replace(":", "").take(6).lowercase()]
+    }
+
+    private val phoneBrands = listOf("samsung", "xiaomi", "huawei", "oppo", "vivo", "oneplus", "realme",
+        "motorola", "google", "tecno", "transsion", "honor", "nothing", "lg elec", "sony mobile", "htc",
+        "infinix", "itel", "symphony", "walton", "lava", "micromax", "meizu", "fairphone", "nokia", "hmd")
+    private val pcBrands = listOf("intel", "dell", "lenovo", "hewlett", "hp inc", "asustek", "acer",
+        "microsoft", "liteon", "lite-on", "azurewave", "realtek", "killer", "micro-star",
+        "gigabyte", "giga-byte", "toshiba", "fujitsu", "wistron", "quanta", "compal", "pegatron", "foxconn", "hon hai")
+    private val routerBrands = listOf("tp-link", "tenda", "d-link", "netgear", "mikrotik", "routerboard",
+        "ubiquiti", "zyxel", "totolink", "cudy", "linksys", "belkin", "tplink", "ruijie", "fiberhome",
+        "zte", "huawei device", "grandstream", "draytek", "juniper", "cisco", "aruba", "ruckus")
+    private val tvBrands = listOf("roku", "vizio", "tcl", "hisense", "skyworth", "amazon", "espressif", "tuya")
+    private val printerBrands = listOf("epson", "brother", "canon", "xerox", "ricoh", "lexmark", "kyocera")
+
+    private fun has(s: String, keys: List<String>) = keys.any { s.contains(it) }
+
+    private val portsToProbe = intArrayOf(62078, 445, 135, 3389, 5900, 548, 9100, 631, 8009, 5555)
+    private fun openPorts(ip: String): Set<Int> {
+        val open = mutableSetOf<Int>()
+        for (p in portsToProbe) try {
+            Socket().use { it.connect(InetSocketAddress(ip, p), 250); open += p }
+        } catch (e: Exception) { }
+        return open
+    }
+
+    /** returns (type, isGuess) */
+    private fun classify(name: String, vendor: String?, ttl: Int?, ports: Set<Int>, router: Boolean, randomMac: Boolean): Pair<String, Boolean> {
+        val n = name.lowercase()
+        val v = vendor?.lowercase() ?: ""
+        if (router) return "Router" to false
+        // hostname clues (most reliable)
+        if (n.contains("iphone") || n.contains("ipad")) return "Phone (iPhone/iPad)" to false
+        if (n.contains("macbook") || n.contains("imac") || n.contains("mac-mini") || n.contains("macmini") || n.contains("mac-pro")) return "Computer (Mac)" to false
+        if (n.startsWith("desktop-") || n.startsWith("laptop-") || n.startsWith("win") || n.contains("-pc") || n.startsWith("pc-")) return "Computer (Windows)" to false
+        if (has(n, listOf("android", "galaxy", "redmi", "xiaomi", "poco", "oppo", "vivo", "realme", "pixel", "oneplus", "huawei", "honor", "tecno", "infinix", "itel", "samsung-sm", "sm-"))) return "Phone (Android)" to false
+        if (has(n, listOf("-tv", "tv-", "roku", "chromecast", "bravia", "firetv", "smarttv"))) return "TV / Streaming" to false
+        if (has(n, listOf("printer", "epson", "laserjet", "deskjet"))) return "Printer" to false
+        // open ports
+        if (62078 in ports) return "Phone (iPhone/iPad)" to false
+        if (9100 in ports || 631 in ports) return "Printer" to false
+        if (445 in ports || 135 in ports || 3389 in ports) return "Computer (Windows)" to false
+        if (5900 in ports || 548 in ports) return "Computer (Mac)" to false
+        if (5555 in ports) return "Phone (Android)" to true
+        if (8009 in ports) return "TV / Streaming" to false
+        // vendor from MAC (only valid when MAC is not randomised)
+        if (!randomMac && vendor != null) {
+            if (v.contains("apple")) return (if (ttl != null && ttl > 64) "Apple device" else "Apple (iPhone / Mac)") to true
+            if (has(v, routerBrands) && !has(v, listOf("huawei"))) return "Router / Network device" to true
+            if (has(v, phoneBrands)) return "Phone" to true
+            if (has(v, pcBrands)) return "Computer" to true
+            if (has(v, printerBrands)) return "Printer" to true
+            if (has(v, tvBrands)) return "TV / IoT device" to true
+        }
+        if (ttl != null && ttl in 65..128) return "Computer (Windows)" to true
+        if (randomMac) return "Phone" to true      // random MAC is almost always a phone
+        return "Unknown" to false
+    }
+
+    fun scan(ctx: Context): List<Device> {
         val (iface, myIp) = localWifi() ?: return emptyList()
         val base = myIp.substringBeforeLast(".")
 
         // 1) wake every host so it appears in the neighbour (ARP) table
-        su("for i in \$(seq 1 254); do ping -c 1 -W 1 $base.\$i >/dev/null 2>&1 & done; wait")
+        val ttlOut = su("for i in \$(seq 1 254); do (r=\$(ping -c 1 -W 1 $base.\$i 2>/dev/null | grep -o 'ttl=[0-9]*'); [ -n \"\$r\" ] && echo \"$base.\$i \$r\") & done; wait")
+        val ttls = ttlOut.lines().mapNotNull { l ->
+            val p = l.trim().split(" ")
+            if (p.size == 2) p[0] to p[1].removePrefix("ttl=").toIntOrNull() else null
+        }.toMap()
 
         // 2) gateway (router)
         val gateway = Regex("default via (\\S+)").find(su("ip route show dev $iface"))?.groupValues?.get(1)
@@ -53,15 +131,22 @@ object Scanner {
         val futures = rows.map { (ip, mac) ->
             pool.submit(Callable {
                 val tags = mutableListOf<String>()
-                if (ip == gateway) tags += "Router"
-                if (isRandomMac(mac)) tags += "Private MAC"
-                Device(ip, mac, resolveName(ip), tags)
+                val random = isRandomMac(mac)
+                val name = resolveName(ip)
+                val vendor = if (random) null else vendorOf(ctx, mac)
+                val (type, guess) = classify(name, vendor, ttls[ip], openPorts(ip), ip == gateway, random)
+                tags += if (guess) "$type?" else type
+                if (vendor != null) tags += vendor
+                if (random) tags += "Private MAC"
+                Device(ip, mac, name, tags, type, vendor)
             })
         }
         val result = futures.map { it.get() }.toMutableList()
         pool.shutdown()
 
-        result.add(Device(myIp, "(hidden by Android)", android.os.Build.MODEL, listOf("This device")))
+        result.add(Device(myIp, "(hidden by Android)", android.os.Build.MODEL,
+            listOf("This device", "Phone", android.os.Build.MANUFACTURER.replaceFirstChar { it.uppercase() }),
+            "Phone", android.os.Build.MANUFACTURER))
         return result.sortedBy { it.ip.substringAfterLast(".").toIntOrNull() ?: 999 }
     }
 

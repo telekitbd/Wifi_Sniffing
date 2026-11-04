@@ -84,7 +84,7 @@ class MainActivity : Activity() {
         }
         list.setOnItemLongClickListener { _, _, pos, _ ->
             val d = devices[pos]
-            copyText("Device", "${d.name}\n${d.ip}\n${d.mac}", "Copied name, IP and MAC")
+            copyText("Device", "${d.name}\n${d.type}\n${d.ip}\n${d.mac}", "Copied name, type, IP and MAC")
             true
         }
         findViewById<View>(R.id.copyAllBtn).setOnClickListener {
@@ -92,7 +92,7 @@ class MainActivity : Activity() {
             if (rows.isEmpty()) {
                 Toast.makeText(this, "Nothing to copy. Scan first.", Toast.LENGTH_SHORT).show()
             } else {
-                copyText("Devices", rows.joinToString("\n") { "${it.name} | ${it.ip} | ${it.mac}" },
+                copyText("Devices", rows.joinToString("\n") { "${it.name} | ${it.type} | ${it.ip} | ${it.mac}" },
                     "Copied ${rows.size} devices")
             }
         }
@@ -191,7 +191,7 @@ class MainActivity : Activity() {
         thread {
             val root = Scanner.hasRoot()
             val wifi = Scanner.localWifi()
-            val found = if (root && wifi != null) Scanner.scan() else emptyList()
+            val found = if (root && wifi != null) Scanner.scan(applicationContext) else emptyList()
             runOnUiThread {
                 scanBtn.isEnabled = true
                 scanBtn.alpha = 1f
@@ -228,6 +228,7 @@ class MainActivity : Activity() {
                 "5. Long-press a card to copy name + IP + MAC\n" +
                 "6. \"Copy all\" copies the whole list\n\n" +
                 "GOOD TO KNOW\n" +
+                "• Type (Phone / Computer / Router...) is detected from name, open ports and MAC vendor. A \"?\" means it is a best guess\n" +
                 "• \"Unknown\" = device does not share its name\n" +
                 "• \"Private MAC\" = phone uses a random MAC for this WiFi\n" +
                 "• Your own MAC is hidden by Android\n" +
