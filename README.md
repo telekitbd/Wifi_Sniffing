@@ -9,7 +9,13 @@ Rooted Android app that lists every device on the WiFi you are connected to, wit
 ## Build the APK
 1. Push this project to a GitHub repo
 2. Open **Actions → Build APK** (runs on every push)
-3. Download `WifiRadar-debug` from the run's **Artifacts**, unzip, install `app-debug.apk`
+3. Open the repo's **Releases** page (or the run's Artifacts) and install `WifiRadar.apk`
+
+## Update without uninstalling
+- Every build is signed with the same key (`app/wifiradar.jks`) and gets a higher version number, so a new APK installs over the old app (no uninstall, data kept).
+- Every push to GitHub publishes a new Release. The app checks it on start (and via **Check update** at the bottom) and shows **Update now**.
+- With root the update installs silently and the app reopens. Without root Android shows its normal install prompt.
+- The repo must be public (so the app can read releases). The first time only: uninstall the old app once, because older builds used a different signing key.
 
 ## Use
 1. Open the app, allow root when asked

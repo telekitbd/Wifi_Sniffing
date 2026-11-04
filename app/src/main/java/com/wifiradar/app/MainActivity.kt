@@ -12,6 +12,8 @@ import android.content.ClipboardManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.provider.Settings
+import java.io.File
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -120,12 +122,72 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.helpBtn).setOnClickListener { showHelp() }
         findViewById<View>(R.id.creditsBtn).setOnClickListener { showCredits() }
         scanBtn.setOnClickListener { scan() }
+        findViewById<TextView>(R.id.updateBtn).apply {
+            text = "Check update (v${BuildConfig.VERSION_NAME})"
+            setOnClickListener { checkUpdate(true) }
+        }
+        checkUpdate(false)
 
         refreshStatus()
         val prefs = getSharedPreferences("p", MODE_PRIVATE)
         if (!prefs.getBoolean("seen_help", false)) {
             prefs.edit().putBoolean("seen_help", true).apply()
             showHelp()
+        }
+    }
+
+    private fun checkUpdate(manual: Boolean) {
+        if (manual) Toast.makeText(this, "Checking for update...", Toast.LENGTH_SHORT).show()
+        thread {
+            val info = Updater.check()
+            runOnUiThread {
+                if (isFinishing) return@runOnUiThread
+                when {
+                    info != null && info.code > BuildConfig.VERSION_CODE -> showUpdate(info)
+                    manual && info == null -> Toast.makeText(this, "Couldn't check for update. Check your internet.", Toast.LENGTH_LONG).show()
+                    manual -> Toast.makeText(this, "You have the latest version", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun showUpdate(info: Updater.Info) {
+        val notes = info.notes.trim().ifEmpty { "Bug fixes and improvements." }
+        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Update available")
+            .setMessage("${info.name}\n(you have v${BuildConfig.VERSION_NAME})\n\n$notes\n\nYour app is updated in place. No need to uninstall.")
+            .setPositiveButton("Update now") { _, _ -> startUpdate(info) }
+            .setNegativeButton("Later", null)
+            .show()
+    }
+
+    private fun startUpdate(info: Updater.Info) {
+        val dlg = AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+            .setTitle("Updating")
+            .setMessage("Downloading... 0%")
+            .setCancelable(false)
+            .show()
+        thread {
+            val apk = File(cacheDir, "updates/WifiRadar.apk")
+            val ok = Updater.download(info.url, apk) { p ->
+                runOnUiThread { dlg.setMessage("Downloading... $p%") }
+            }
+            if (!ok) {
+                runOnUiThread { dlg.dismiss(); Toast.makeText(this, "Download failed. Try again.", Toast.LENGTH_LONG).show() }
+                return@thread
+            }
+            runOnUiThread { dlg.setMessage("Installing...") }
+            if (Scanner.hasRoot() && Updater.rootInstall(apk)) return@thread
+            runOnUiThread {
+                dlg.dismiss()
+                if (!packageManager.canRequestPackageInstalls()) {
+                    Toast.makeText(this, "Allow \"Install unknown apps\" for WiFi Radar, then tap Update again", Toast.LENGTH_LONG).show()
+                    startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                } else {
+                    try { Updater.sessionInstall(this, apk) }
+                    catch (e: Exception) { Toast.makeText(this, "Install failed: ${e.message}", Toast.LENGTH_LONG).show() }
+                }
+            }
         }
     }
 
